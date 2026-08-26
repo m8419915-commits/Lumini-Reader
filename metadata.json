@@ -1,0 +1,6 @@
+{
+  "name": "Lumina Reader",
+  "description": "Flagship Android sequential image and manga ecosystem featuring Lumina Noir AMOLED design, continuous webtoon tiling reader, Lumina Flow dynamic ambient immersion, Lumina Snap 1-sec state restore, Universe Map character graphs, Manga DNA analysis, and offline downloads.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
