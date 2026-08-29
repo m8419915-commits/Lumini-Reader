@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-lumina-black: #000000;
+    --color-lumina-surface: #09090b;
+    --color-lumina-surface-variant: #121216;
+    --color-lumina-surface-card: #18181f;
+    --color-lumina-border: #27272a;
+    --color-lumina-cyan: #00e5ff;
+    --color-lumina-violet: #8b5cf6;
+    --color-lumina-violet-secondary: #a78bfa;
+    --color-lumina-amber: #f59e0b;
+    --color-lumina-emerald: #10b981;
+    --color-lumina-rose: #f43f5e;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #000000;
+    color: #ffffff;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Custom Scrollbars for AMOLED dark mode */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8b5cf6;
+}
+
+/* Ambient glow animations */
+@keyframes ambientPulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.05);
+  }
+}
+
+.animate-ambient-glow {
+  animation: ambientPulse 4s ease-in-out infinite;
+}
+
+/* Hardware accelerated transitions */
+.smooth-render {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
