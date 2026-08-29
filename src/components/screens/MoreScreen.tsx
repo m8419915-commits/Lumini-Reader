@@ -6,7 +6,7 @@ import {
   Sliders,
   Compass,
   GitBranch,
-  CloudSync,
+  UploadCloud,
   Settings,
   ChevronRight,
   ShieldCheck,
@@ -151,16 +151,64 @@ export const MoreScreen: React.FC = () => {
 
           <div className="space-y-2">
             <div
+              onClick={() => navigate('home')}
+              className="bg-[#121216] hover:bg-[#18181E] border border-[#27272A] hover:border-[#8B5CF6]/50 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-[#8B5CF6]/15 border border-[#8B5CF6]/40 flex items-center justify-center text-[#A78BFA]">
+                  <Compass className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Home Discovery Dashboard</h4>
+                  <p className="text-xs text-zinc-400">Curated spotlights, reading stats, and rapid continue</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-zinc-500" />
+            </div>
+
+            <div
+              onClick={() => navigate('repositories')}
+              className="bg-[#121216] hover:bg-[#18181E] border border-[#27272A] hover:border-[#00E5FF]/50 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/40 flex items-center justify-center text-[#00E5FF]">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Extension Repositories</h4>
+                  <p className="text-xs text-zinc-400">Keiyoushi repo, custom index sources, 100% compatible</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-zinc-500" />
+            </div>
+
+            <div
+              onClick={() => navigate('migration')}
+              className="bg-[#121216] hover:bg-[#18181E] border border-[#27272A] hover:border-amber-500/50 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <GitBranch className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Source Migration Suite</h4>
+                  <p className="text-xs text-zinc-400">Batch migrate manga across sources without losing progress</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-zinc-500" />
+            </div>
+
+            <div
               onClick={() => navigate('backup')}
               className="bg-[#121216] hover:bg-[#18181E] border border-[#27272A] rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-3.5">
                 <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-300">
-                  <CloudSync className="w-5 h-5" />
+                  <UploadCloud className="w-5 h-5" />
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-white">Backup & Cloud Sync</h4>
-                  <p className="text-xs text-zinc-400">Google Drive sync, .lumina backup vault</p>
+                  <p className="text-xs text-zinc-400">Google Drive sync, .lumina & Tachiyomi backup vault</p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-zinc-500" />

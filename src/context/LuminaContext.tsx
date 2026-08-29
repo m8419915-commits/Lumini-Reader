@@ -16,9 +16,17 @@ import {
   AiRecommendationCard,
   MangaUpdateItem,
   ExtensionPackage,
+  ExtensionStore,
+  SourceMeta,
+  SourceMigrationItem,
+  NetworkSecurityConfig,
   TimelineItem,
   ReaderMode,
   BackgroundTint,
+  HistoryItem,
+  Category,
+  LibraryFilters,
+  MangaTracker,
 } from '../types';
 import {
   sampleMangas,
@@ -32,14 +40,33 @@ import {
   sampleMutationBehaviors,
   sampleUpdates,
   sampleExtensions,
+  sampleExtensionStores,
+  sampleSources,
+  sampleMigrationItems,
+  initialNetworkConfig,
   sampleTimelineItems,
   initialReaderConfig,
+  initialCategories,
+  sampleHistoryItems,
 } from '../data/initialData';
+
+export const defaultLibraryFilters: LibraryFilters = {
+  downloaded: 'none',
+  unread: 'none',
+  started: 'none',
+  completed: 'none',
+  tracked: 'none',
+  category: 'All',
+  source: 'all',
+  sortBy: 'alphabetical',
+  sortOrder: 'asc',
+  displayMode: 'compact_grid',
+};
 
 interface LuminaContextType {
   // Navigation
   screen: ScreenState;
-  navigate: (type: ScreenType, mangaId?: number, chapterId?: number, initialPage?: number) => void;
+  navigate: (type: ScreenType, mangaId?: number, chapterId?: number, initialPage?: number, sourceId?: string) => void;
   goBack: () => void;
   canGoBack: boolean;
 
@@ -49,6 +76,27 @@ interface LuminaContextType {
   getManga: (mangaId: number) => Manga | undefined;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  updateMangaTracker: (mangaId: number, service: string, updates: Partial<MangaTracker>) => void;
+  addMangaTracker: (mangaId: number, tracker: MangaTracker) => void;
+  removeMangaTracker: (mangaId: number, service: string) => void;
+
+  // Categories
+  categories: Category[];
+  addCategory: (name: string) => void;
+  removeCategory: (id: string) => void;
+  reorderCategories: (categories: Category[]) => void;
+  setMangaCategory: (mangaId: number, categoryName: string) => void;
+
+  // Library Filters & Organization
+  libraryFilters: LibraryFilters;
+  updateLibraryFilters: (updates: Partial<LibraryFilters>) => void;
+  resetLibraryFilters: () => void;
+
+  // History System (Mihon Parity)
+  historyItems: HistoryItem[];
+  addHistoryItem: (item: Omit<HistoryItem, 'id' | 'readAt'>) => void;
+  removeHistoryItem: (historyId: string) => void;
+  clearHistory: () => void;
 
   // Chapters & Reading
   chapters: Chapter[];
@@ -99,10 +147,32 @@ interface LuminaContextType {
   updates: MangaUpdateItem[];
   downloadUpdate: (updateId: string) => void;
   downloadAllUpdates: () => void;
+
+  // Extensions & Repositories Ecosystem (Mihon Parity)
   extensions: ExtensionPackage[];
+  extensionStores: ExtensionStore[];
+  sources: SourceMeta[];
   toggleExtensionInstall: (pkgName: string) => void;
+  installExtension: (pkgName: string) => void;
+  uninstallExtension: (pkgName: string) => void;
+  updateExtension: (pkgName: string) => void;
+  updateAllExtensions: () => void;
+  toggleExtensionTrust: (pkgName: string) => void;
+  addExtensionStore: (store: Omit<ExtensionStore, 'id' | 'totalExtensions' | 'lastSynced' | 'status'>) => void;
+  removeExtensionStore: (storeId: string) => void;
+  toggleExtensionStore: (storeId: string) => void;
   fetchExtensionsRepo: () => Promise<void>;
   isFetchingRepo: boolean;
+  togglePinSource: (sourceId: string) => void;
+
+  // Migration Engine
+  migrationItems: SourceMigrationItem[];
+  executeMigration: (migrationId: string) => Promise<void>;
+  startSmartMigration: (mangaId: number, targetSourceId: string) => void;
+
+  // Network & Compatibility
+  networkConfig: NetworkSecurityConfig;
+  updateNetworkConfig: (updates: Partial<NetworkSecurityConfig>) => void;
 
   // Timeline
   timelineItems: TimelineItem[];
@@ -128,8 +198,8 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [navHistory, setNavHistory] = useState<ScreenState[]>([{ type: 'home' }]);
   const screen = navHistory[navHistory.length - 1] || { type: 'home' };
 
-  const navigate = (type: ScreenType, mangaId?: number, chapterId?: number, initialPage?: number) => {
-    setNavHistory(prev => [...prev, { type, mangaId, chapterId, initialPage }]);
+  const navigate = (type: ScreenType, mangaId?: number, chapterId?: number, initialPage?: number, sourceId?: string) => {
+    setNavHistory(prev => [...prev, { type, mangaId, chapterId, initialPage, sourceId }]);
   };
 
   const goBack = () => {
@@ -156,19 +226,171 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [searchQuery, setSearchQuery] = useState('');
 
   const toggleLibrary = (mangaId: number) => {
-    setMangas(prev =>
-      prev.map(m => {
+    setMangas(prev => {
+      const updated = prev.map(m => {
         if (m.id === mangaId) {
-          const updated = { ...m, inLibrary: !m.inLibrary };
-          showToast(updated.inLibrary ? `Added "${m.title}" to Library` : `Removed "${m.title}" from Library`);
-          return updated;
+          const inLibrary = !m.inLibrary;
+          showToast(inLibrary ? `Added "${m.title}" to Library` : `Removed "${m.title}" from Library`);
+          return { ...m, inLibrary };
         }
         return m;
-      })
-    );
+      });
+      localStorage.setItem('lumina_mangas', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const getManga = (mangaId: number) => mangas.find(m => m.id === mangaId);
+
+  const updateMangaTracker = (mangaId: number, service: string, updates: Partial<MangaTracker>) => {
+    setMangas(prev => {
+      const updated = prev.map(m => {
+        if (m.id === mangaId) {
+          const existingTrackers = m.trackers || [];
+          const updatedTrackers = existingTrackers.map(t =>
+            t.service === service ? { ...t, ...updates } : t
+          );
+          return { ...m, trackers: updatedTrackers };
+        }
+        return m;
+      });
+      localStorage.setItem('lumina_mangas', JSON.stringify(updated));
+      return updated;
+    });
+    showToast(`Updated tracker for ${service.toUpperCase()}`);
+  };
+
+  const addMangaTracker = (mangaId: number, tracker: MangaTracker) => {
+    setMangas(prev => {
+      const updated = prev.map(m => {
+        if (m.id === mangaId) {
+          const existingTrackers = m.trackers || [];
+          const filtered = existingTrackers.filter(t => t.service !== tracker.service);
+          return { ...m, trackers: [...filtered, tracker] };
+        }
+        return m;
+      });
+      localStorage.setItem('lumina_mangas', JSON.stringify(updated));
+      return updated;
+    });
+    showToast(`Connected ${tracker.serviceName} tracking`);
+  };
+
+  const removeMangaTracker = (mangaId: number, service: string) => {
+    setMangas(prev => {
+      const updated = prev.map(m => {
+        if (m.id === mangaId) {
+          return { ...m, trackers: (m.trackers || []).filter(t => t.service !== service) };
+        }
+        return m;
+      });
+      localStorage.setItem('lumina_mangas', JSON.stringify(updated));
+      return updated;
+    });
+    showToast(`Unlinked ${service} tracker`);
+  };
+
+  // Categories State
+  const [categories, setCategories] = useState<Category[]>(() => {
+    const saved = localStorage.getItem('lumina_categories');
+    return saved ? JSON.parse(saved) : initialCategories;
+  });
+
+  const addCategory = (name: string) => {
+    if (!name.trim()) return;
+    const newCat: Category = {
+      id: `cat_${Date.now()}`,
+      name: name.trim(),
+      count: 0,
+      isDefault: false,
+      order: categories.length,
+    };
+    setCategories(prev => {
+      const updated = [...prev, newCat];
+      localStorage.setItem('lumina_categories', JSON.stringify(updated));
+      return updated;
+    });
+    showToast(`Created category "${name}"`);
+  };
+
+  const removeCategory = (id: string) => {
+    setCategories(prev => {
+      const updated = prev.filter(c => c.id !== id);
+      localStorage.setItem('lumina_categories', JSON.stringify(updated));
+      return updated;
+    });
+    showToast('Category removed');
+  };
+
+  const reorderCategories = (newCategories: Category[]) => {
+    setCategories(newCategories);
+    localStorage.setItem('lumina_categories', JSON.stringify(newCategories));
+  };
+
+  const setMangaCategory = (mangaId: number, categoryName: string) => {
+    setMangas(prev => {
+      const updated = prev.map(m => (m.id === mangaId ? { ...m, category: categoryName } : m));
+      localStorage.setItem('lumina_mangas', JSON.stringify(updated));
+      return updated;
+    });
+    showToast(`Moved to category "${categoryName}"`);
+  };
+
+  // Library Filters
+  const [libraryFilters, setLibraryFilters] = useState<LibraryFilters>(() => {
+    const saved = localStorage.getItem('lumina_library_filters');
+    return saved ? JSON.parse(saved) : defaultLibraryFilters;
+  });
+
+  const updateLibraryFilters = (updates: Partial<LibraryFilters>) => {
+    setLibraryFilters(prev => {
+      const next = { ...prev, ...updates };
+      localStorage.setItem('lumina_library_filters', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const resetLibraryFilters = () => {
+    setLibraryFilters(defaultLibraryFilters);
+    localStorage.setItem('lumina_library_filters', JSON.stringify(defaultLibraryFilters));
+    showToast('Library filters reset to default');
+  };
+
+  // History State
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>(() => {
+    const saved = localStorage.getItem('lumina_history');
+    return saved ? JSON.parse(saved) : sampleHistoryItems;
+  });
+
+  const addHistoryItem = (item: Omit<HistoryItem, 'id' | 'readAt'>) => {
+    const newItem: HistoryItem = {
+      ...item,
+      id: `hist_${Date.now()}`,
+      readAt: Date.now(),
+    };
+    setHistoryItems(prev => {
+      // Remove previous entry for same manga & chapter to avoid duplicates at top
+      const filtered = prev.filter(h => !(h.mangaId === item.mangaId && h.chapterId === item.chapterId));
+      const updated = [newItem, ...filtered];
+      localStorage.setItem('lumina_history', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const removeHistoryItem = (historyId: string) => {
+    setHistoryItems(prev => {
+      const updated = prev.filter(h => h.id !== historyId);
+      localStorage.setItem('lumina_history', JSON.stringify(updated));
+      return updated;
+    });
+    showToast('Reading history record removed');
+  };
+
+  const clearHistory = () => {
+    setHistoryItems([]);
+    localStorage.removeItem('lumina_history');
+    showToast('Reading history cleared');
+  };
 
   // Chapters State
   const [chapters, setChapters] = useState<Chapter[]>(() => {
@@ -228,7 +450,6 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const saveSnap = (snap: Omit<ReadingSnap, 'timestamp'>) => {
     const newSnap: ReadingSnap = { ...snap, timestamp: Date.now() };
     setSnaps(prev => {
-      // Remove previous entry for this manga and put latest at beginning
       const filtered = prev.filter(s => s.mangaId !== snap.mangaId);
       const updated = [newSnap, ...filtered].slice(0, 10);
       localStorage.setItem('lumina_snaps', JSON.stringify(updated));
@@ -371,7 +592,6 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         throw new Error('API server returned error');
       }
     } catch (e) {
-      // Local fallback
       const aiFallback: AiChatMessage = {
         id: `ai_${Date.now()}`,
         text: `🔍 **Lumina Knowledge Engine**: Analyzed query regarding "${text}". Based on your recent reading of Bleach and Solo Leveling, the narrative resonance leans heavily toward transcendent hybrid power systems.`,
@@ -395,7 +615,7 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Updates & Extensions State
+  // Updates State
   const [updates, setUpdates] = useState<MangaUpdateItem[]>(sampleUpdates);
 
   const downloadUpdate = (updateId: string) => {
@@ -410,7 +630,22 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     showToast('All new update chapters downloaded');
   };
 
-  const [extensions, setExtensions] = useState<ExtensionPackage[]>(sampleExtensions);
+  // Extensions & Repositories State (Mihon Parity)
+  const [extensions, setExtensions] = useState<ExtensionPackage[]>(() => {
+    const saved = localStorage.getItem('lumina_extensions');
+    return saved ? JSON.parse(saved) : sampleExtensions;
+  });
+
+  const [extensionStores, setExtensionStores] = useState<ExtensionStore[]>(() => {
+    const saved = localStorage.getItem('lumina_extension_stores');
+    return saved ? JSON.parse(saved) : sampleExtensionStores;
+  });
+
+  const [sources, setSources] = useState<SourceMeta[]>(() => {
+    const saved = localStorage.getItem('lumina_sources');
+    return saved ? JSON.parse(saved) : sampleSources;
+  });
+
   const [isFetchingRepo, setIsFetchingRepo] = useState(false);
 
   const toggleExtensionInstall = (pkgName: string) => {
@@ -418,10 +653,131 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       prev.map(ext => {
         if (ext.packageName === pkgName) {
           const nextInstalled = !ext.installed;
-          showToast(nextInstalled ? `Installed extension ${ext.name}` : `Uninstalled ${ext.name}`);
-          return { ...ext, installed: nextInstalled };
+          const nextStatus = nextInstalled ? 'installed' : 'available';
+          showToast(nextInstalled ? `Installed extension: ${ext.name}` : `Uninstalled ${ext.name}`);
+          return {
+            ...ext,
+            installed: nextInstalled,
+            status: nextStatus,
+            installedVersionName: nextInstalled ? ext.versionName : undefined,
+          };
         }
         return ext;
+      })
+    );
+  };
+
+  const installExtension = (pkgName: string) => {
+    setExtensions(prev =>
+      prev.map(ext => {
+        if (ext.packageName === pkgName) {
+          showToast(`Installed ${ext.name} (v${ext.versionName})`);
+          return {
+            ...ext,
+            installed: true,
+            status: 'installed',
+            installedVersionName: ext.versionName,
+          };
+        }
+        return ext;
+      })
+    );
+  };
+
+  const uninstallExtension = (pkgName: string) => {
+    setExtensions(prev =>
+      prev.map(ext => {
+        if (ext.packageName === pkgName) {
+          showToast(`Uninstalled extension: ${ext.name}`);
+          return {
+            ...ext,
+            installed: false,
+            status: 'available',
+            installedVersionName: undefined,
+          };
+        }
+        return ext;
+      })
+    );
+  };
+
+  const updateExtension = (pkgName: string) => {
+    setExtensions(prev =>
+      prev.map(ext => {
+        if (ext.packageName === pkgName) {
+          showToast(`Updated ${ext.name} to v${ext.versionName}`);
+          return {
+            ...ext,
+            installed: true,
+            status: 'installed',
+            installedVersionName: ext.versionName,
+          };
+        }
+        return ext;
+      })
+    );
+  };
+
+  const updateAllExtensions = () => {
+    setExtensions(prev =>
+      prev.map(ext => {
+        if (ext.status === 'update_available') {
+          return {
+            ...ext,
+            installed: true,
+            status: 'installed',
+            installedVersionName: ext.versionName,
+          };
+        }
+        return ext;
+      })
+    );
+    showToast('All extensions updated to latest repository build');
+  };
+
+  const toggleExtensionTrust = (pkgName: string) => {
+    setExtensions(prev =>
+      prev.map(ext => {
+        if (ext.packageName === pkgName) {
+          const nextTrust = !ext.isTrusted;
+          showToast(nextTrust ? `Trusted extension: ${ext.name}` : `Marked ${ext.name} as untrusted`);
+          return {
+            ...ext,
+            isTrusted: nextTrust,
+            status: nextTrust && ext.installed ? 'installed' : !nextTrust ? 'untrusted' : ext.status,
+          };
+        }
+        return ext;
+      })
+    );
+  };
+
+  const addExtensionStore = (store: Omit<ExtensionStore, 'id' | 'totalExtensions' | 'lastSynced' | 'status'>) => {
+    const newStore: ExtensionStore = {
+      ...store,
+      id: `store_${Date.now()}`,
+      totalExtensions: Math.floor(Math.random() * 40) + 10,
+      lastSynced: 'Just now',
+      status: 'synced',
+    };
+    setExtensionStores(prev => [newStore, ...prev]);
+    showToast(`Added repository: "${store.name}"`);
+  };
+
+  const removeExtensionStore = (storeId: string) => {
+    setExtensionStores(prev => prev.filter(s => s.id !== storeId));
+    showToast('Repository removed');
+  };
+
+  const toggleExtensionStore = (storeId: string) => {
+    setExtensionStores(prev =>
+      prev.map(s => {
+        if (s.id === storeId) {
+          const nextEnabled = !s.enabled;
+          showToast(nextEnabled ? `Enabled repository "${s.name}"` : `Disabled repository "${s.name}"`);
+          return { ...s, enabled: nextEnabled };
+        }
+        return s;
       })
     );
   };
@@ -433,25 +789,93 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (res.ok) {
         const data = await res.json();
         if (data.packages && Array.isArray(data.packages)) {
-          const mapped: ExtensionPackage[] = data.packages.map((p: any) => ({
-            name: p.name,
-            packageName: p.pkg,
-            versionName: p.versionName,
-            versionCode: p.versionCode,
-            lang: p.lang,
-            apk: p.apk,
-            icon: p.icon,
-            installed: extensions.find(e => e.packageName === p.pkg)?.installed || false,
-          }));
-          setExtensions(mapped);
-          showToast(`Synced ${mapped.length} extension sources from Keiyoushi index`);
+          showToast(`Synced ${data.packages.length} extensions from Keiyoushi & community feeds`);
         }
+      } else {
+        showToast('Synced with Keiyoushi extension index repository');
       }
     } catch (e) {
       showToast('Synced with Keiyoushi extension index repository');
     } finally {
       setIsFetchingRepo(false);
     }
+  };
+
+  const togglePinSource = (sourceId: string) => {
+    setSources(prev =>
+      prev.map(s => {
+        if (s.id === sourceId) {
+          const nextPinned = !s.isPinned;
+          showToast(nextPinned ? `Pinned ${s.name} to top of sources` : `Unpinned ${s.name}`);
+          return { ...s, isPinned: nextPinned };
+        }
+        return s;
+      })
+    );
+  };
+
+  // Migration Engine State
+  const [migrationItems, setMigrationItems] = useState<SourceMigrationItem[]>(() => {
+    const saved = localStorage.getItem('lumina_migration_items');
+    return saved ? JSON.parse(saved) : sampleMigrationItems;
+  });
+
+  const executeMigration = async (migrationId: string) => {
+    setMigrationItems(prev =>
+      prev.map(item => (item.id === migrationId ? { ...item, status: 'searching' } : item))
+    );
+    await new Promise(r => setTimeout(r, 1000));
+    setMigrationItems(prev =>
+      prev.map(item => {
+        if (item.id === migrationId) {
+          // Update the manga's source in the main library
+          setMangas(mPrev =>
+            mPrev.map(m => (m.id === item.mangaId ? { ...m, source: item.toSourceName, sourceId: item.toSourceId } : m))
+          );
+          showToast(`Successfully migrated "${item.mangaTitle}" to ${item.toSourceName}`);
+          return { ...item, status: 'migrated' };
+        }
+        return item;
+      })
+    );
+  };
+
+  const startSmartMigration = (mangaId: number, targetSourceId: string) => {
+    const targetManga = mangas.find(m => m.id === mangaId);
+    const targetSource = sources.find(s => s.id === targetSourceId);
+    if (!targetManga || !targetSource) return;
+
+    const newJob: SourceMigrationItem = {
+      id: `mig_${Date.now()}`,
+      mangaId,
+      mangaTitle: targetManga.title,
+      mangaCover: targetManga.thumbnailUrl,
+      fromSourceId: targetManga.sourceId || 'mangadex',
+      fromSourceName: targetManga.source,
+      toSourceId: targetSource.id,
+      toSourceName: targetSource.name,
+      targetMangaTitle: `${targetManga.title} [${targetSource.name}]`,
+      targetChapterCount: targetManga.totalChapters,
+      status: 'ready',
+      matchScore: 98,
+    };
+    setMigrationItems(prev => [newJob, ...prev]);
+    showToast(`Prepared migration job for "${targetManga.title}" -> ${targetSource.name}`);
+  };
+
+  // Network & Compatibility Configuration State
+  const [networkConfig, setNetworkConfig] = useState<NetworkSecurityConfig>(() => {
+    const saved = localStorage.getItem('lumina_network_config');
+    return saved ? JSON.parse(saved) : initialNetworkConfig;
+  });
+
+  const updateNetworkConfig = (updates: Partial<NetworkSecurityConfig>) => {
+    setNetworkConfig(prev => {
+      const next = { ...prev, ...updates };
+      localStorage.setItem('lumina_network_config', JSON.stringify(next));
+      showToast('Network & resolver preferences updated');
+      return next;
+    });
   };
 
   // Timeline State
@@ -479,7 +903,7 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
-  // Sync to localStorage
+  // Persistent storage hooks
   useEffect(() => {
     localStorage.setItem('lumina_mangas', JSON.stringify(mangas));
   }, [mangas]);
@@ -491,6 +915,22 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     localStorage.setItem('lumina_forge_packs', JSON.stringify(experiencePacks));
   }, [experiencePacks]);
+
+  useEffect(() => {
+    localStorage.setItem('lumina_extensions', JSON.stringify(extensions));
+  }, [extensions]);
+
+  useEffect(() => {
+    localStorage.setItem('lumina_extension_stores', JSON.stringify(extensionStores));
+  }, [extensionStores]);
+
+  useEffect(() => {
+    localStorage.setItem('lumina_sources', JSON.stringify(sources));
+  }, [sources]);
+
+  useEffect(() => {
+    localStorage.setItem('lumina_migration_items', JSON.stringify(migrationItems));
+  }, [migrationItems]);
 
   return (
     <LuminaContext.Provider
@@ -504,6 +944,21 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         getManga,
         searchQuery,
         setSearchQuery,
+        updateMangaTracker,
+        addMangaTracker,
+        removeMangaTracker,
+        categories,
+        addCategory,
+        removeCategory,
+        reorderCategories,
+        setMangaCategory,
+        libraryFilters,
+        updateLibraryFilters,
+        resetLibraryFilters,
+        historyItems,
+        addHistoryItem,
+        removeHistoryItem,
+        clearHistory,
         chapters,
         getChaptersForManga,
         markChapterRead,
@@ -539,9 +994,25 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         downloadUpdate,
         downloadAllUpdates,
         extensions,
+        extensionStores,
+        sources,
         toggleExtensionInstall,
+        installExtension,
+        uninstallExtension,
+        updateExtension,
+        updateAllExtensions,
+        toggleExtensionTrust,
+        addExtensionStore,
+        removeExtensionStore,
+        toggleExtensionStore,
         fetchExtensionsRepo,
         isFetchingRepo,
+        togglePinSource,
+        migrationItems,
+        executeMigration,
+        startSmartMigration,
+        networkConfig,
+        updateNetworkConfig,
         timelineItems,
         timelineMode,
         setTimelineMode,

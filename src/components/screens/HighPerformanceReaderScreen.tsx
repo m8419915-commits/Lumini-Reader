@@ -38,6 +38,7 @@ export const HighPerformanceReaderScreen: React.FC<HighPerformanceReaderScreenPr
     goBack,
     navigate,
     markChapterRead,
+    addHistoryItem,
   } = useLumina();
 
   const manga = getManga(mangaId) || getManga(1)!;
@@ -64,6 +65,19 @@ export const HighPerformanceReaderScreen: React.FC<HighPerformanceReaderScreenPr
       chapterNumber: currentChapter.chapterNumber,
       pageIndex: currentPage,
       totalPages: totalPages,
+      progressPercent: (currentPage + 1) / totalPages,
+    });
+
+    addHistoryItem({
+      mangaId: manga.id,
+      mangaTitle: manga.title,
+      coverUrl: manga.thumbnailUrl,
+      chapterId: currentChapter.id,
+      chapterNumber: currentChapter.chapterNumber,
+      chapterTitle: currentChapter.title,
+      pageIndex: currentPage,
+      totalPages: totalPages,
+      readAt: Date.now(),
       progressPercent: (currentPage + 1) / totalPages,
     });
 

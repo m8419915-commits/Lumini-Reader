@@ -1,6 +1,7 @@
 export type ScreenType =
   | 'home'
   | 'library'
+  | 'history'
   | 'explore'
   | 'updates'
   | 'more'
@@ -15,13 +16,15 @@ export type ScreenType =
   | 'timeline'
   | 'backup'
   | 'settings'
-  | 'repositories';
+  | 'repositories'
+  | 'migration';
 
 export interface ScreenState {
   type: ScreenType;
   mangaId?: number;
   chapterId?: number;
   initialPage?: number;
+  sourceId?: string;
 }
 
 export enum ReaderMode {
@@ -47,6 +50,9 @@ export interface ReaderConfig {
   hardwareAcceleration: boolean;
   zoomLevel: number;
   brightness: number;
+  cropWhiteBorders?: boolean;
+  colorFilter?: 'none' | 'invert' | 'grayscale' | 'high_contrast';
+  dualPageSplit?: boolean;
 }
 
 export interface Manga {
@@ -60,11 +66,76 @@ export interface Manga {
   thumbnailUrl: string;
   bannerUrl: string;
   inLibrary: boolean;
+  category?: string;
   rating: number;
   source: string;
+  sourceId?: string;
   totalChapters: number;
   latestChapter: string;
   unreadCount: number;
+  lastReadAt?: number;
+  trackers?: MangaTracker[];
+}
+
+export type TrackerService = 'anilist' | 'myanimelist' | 'kitsu';
+export type TrackerStatus = 'READING' | 'COMPLETED' | 'ON_HOLD' | 'DROPPED' | 'PLAN_TO_READ' | 'REREADING';
+
+export interface MangaTracker {
+  service: TrackerService;
+  serviceName: string;
+  icon?: string;
+  color: string;
+  isConnected: boolean;
+  trackingId?: string;
+  title: string;
+  status: TrackerStatus;
+  score: number;
+  lastChapterRead: number;
+  totalChapters: number;
+  startDate?: string;
+  finishDate?: string;
+}
+
+export interface HistoryItem {
+  id: string;
+  mangaId: number;
+  mangaTitle: string;
+  coverUrl: string;
+  chapterId: number;
+  chapterNumber: number;
+  chapterTitle?: string;
+  pageIndex: number;
+  totalPages: number;
+  timestamp: number;
+  readAt?: number;
+  progressPercent?: number;
+  dateGroup?: string; // 'Today' | 'Yesterday' | '2 days ago' | '3 days ago' | '20/08/26'
+  timeString?: string; // '8:43 am'
+  isFavorite?: boolean;
+}
+
+export type TriState = 'all' | 'included' | 'excluded' | 'none';
+
+export interface LibraryFilters {
+  downloaded: TriState;
+  unread: TriState;
+  completed: TriState;
+  started?: TriState;
+  tracked?: TriState;
+  bookmarked?: TriState;
+  category?: string;
+  source?: string;
+  displayMode?: 'compact_grid' | 'comfortable_grid' | 'list' | 'cover_only';
+  sortBy: 'title' | 'lastRead' | 'totalChapters' | 'unread' | 'rating' | 'alphabetical' | 'unreadCount' | 'latestUpdate' | 'dateAdded';
+  sortOrder: 'asc' | 'desc';
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  order: number;
+  count?: number;
+  isDefault?: boolean;
 }
 
 export interface Chapter {
@@ -175,15 +246,86 @@ export interface MangaUpdateItem {
   isDownloaded: boolean;
 }
 
+// Mihon & Tachiyomi Extension Architecture Models
+export type ExtensionStatus = 'installed' | 'update_available' | 'available' | 'untrusted' | 'obsolete';
+
+export interface SourceMeta {
+  id: string;
+  name: string;
+  lang: string;
+  baseUrl: string;
+  isPinned: boolean;
+  isNsfw: boolean;
+  supportsLatest: boolean;
+  status: 'online' | 'rate_limited' | 'maintenance' | 'cloudflare';
+  icon: string;
+  extensionPkg: string;
+  itemCount: number;
+  version: string;
+}
+
 export interface ExtensionPackage {
   name: string;
   packageName: string;
   versionName: string;
   versionCode: number;
+  libVersion: string;
   lang: string;
+  isNsfw: boolean;
+  hasReadme: boolean;
+  hasChangelog: boolean;
   apk: string;
   icon: string;
+  repoId: string;
+  repoName: string;
+  status: ExtensionStatus;
+  isTrusted: boolean;
+  installedVersionName?: string;
+  sources: SourceMeta[];
+  readmeContent?: string;
+  changelogContent?: string;
   installed?: boolean;
+}
+
+export interface ExtensionStore {
+  id: string;
+  name: string;
+  baseUrl: string;
+  indexUrl: string;
+  website: string;
+  isOfficial: boolean;
+  isPinned: boolean;
+  enabled: boolean;
+  lastSynced: string;
+  totalExtensions: number;
+  status: 'synced' | 'syncing' | 'error';
+  fingerprint?: string;
+}
+
+export interface SourceMigrationItem {
+  id: string;
+  mangaId: number;
+  mangaTitle: string;
+  mangaCover: string;
+  fromSourceId: string;
+  fromSourceName: string;
+  toSourceId: string;
+  toSourceName: string;
+  targetMangaTitle: string;
+  targetChapterCount: number;
+  status: 'idle' | 'searching' | 'ready' | 'migrated';
+  matchScore: number;
+}
+
+export interface NetworkSecurityConfig {
+  dohProvider: 'default' | 'cloudflare' | 'google' | 'adguard' | 'quad9' | 'disabled';
+  customUserAgent: string;
+  enableCloudflareResolver: boolean;
+  cloudflareBypass?: boolean;
+  trustUntrustedExtensions?: boolean;
+  rateLimitPerSecond: number;
+  requestTimeoutSec: number;
+  extensionAutoCheck: boolean;
 }
 
 export interface TimelineItem {
@@ -195,3 +337,4 @@ export interface TimelineItem {
   imageUrl?: string;
   dateOrChapter: string;
 }
+

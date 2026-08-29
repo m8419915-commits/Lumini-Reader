@@ -8,6 +8,7 @@ import { HomeDashboardScreen } from './components/screens/HomeDashboardScreen';
 import { LibraryScreen } from './components/screens/LibraryScreen';
 import { ExploreScreen } from './components/screens/ExploreScreen';
 import { UpdatesScreen } from './components/screens/UpdatesScreen';
+import { HistoryScreen } from './components/screens/HistoryScreen';
 import { MoreScreen } from './components/screens/MoreScreen';
 import { MangaDetailScreen } from './components/screens/MangaDetailScreen';
 import { HighPerformanceReaderScreen } from './components/screens/HighPerformanceReaderScreen';
@@ -21,18 +22,16 @@ import { MangaTimelineScreen } from './components/screens/MangaTimelineScreen';
 import { BackupSyncScreen } from './components/screens/BackupSyncScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { RepositoriesScreen } from './components/screens/RepositoriesScreen';
+import { MigrationScreen } from './components/screens/MigrationScreen';
 
 const MainContent: React.FC = () => {
   const {
-    currentTab,
-    selectedMangaId,
-    selectedChapterId,
-    selectedPageIndex,
-    toastMessage,
+    screen,
+    activeToast,
   } = useLumina();
 
   const renderScreen = () => {
-    switch (currentTab) {
+    switch (screen.type) {
       case 'home':
         return <HomeDashboardScreen />;
       case 'library':
@@ -41,20 +40,22 @@ const MainContent: React.FC = () => {
         return <ExploreScreen />;
       case 'updates':
         return <UpdatesScreen />;
+      case 'history':
+        return <HistoryScreen />;
       case 'more':
         return <MoreScreen />;
       case 'detail':
-        return <MangaDetailScreen mangaId={selectedMangaId || 1} />;
+        return <MangaDetailScreen mangaId={screen.mangaId || 1} />;
       case 'reader':
         return (
           <HighPerformanceReaderScreen
-            mangaId={selectedMangaId || 1}
-            chapterId={selectedChapterId || 101}
-            initialPage={selectedPageIndex || 0}
+            mangaId={screen.mangaId || 1}
+            chapterId={screen.chapterId || 101}
+            initialPage={screen.initialPage || 0}
           />
         );
       case 'universe':
-        return <MangaUniverseMapScreen mangaId={selectedMangaId} />;
+        return <MangaUniverseMapScreen mangaId={screen.mangaId} />;
       case 'dna':
         return <MangaDnaAchievementsScreen />;
       case 'forge':
@@ -66,19 +67,21 @@ const MainContent: React.FC = () => {
       case 'journey':
         return <LuminaJourneyMapScreen />;
       case 'timeline':
-        return <MangaTimelineScreen mangaId={selectedMangaId} />;
+        return <MangaTimelineScreen mangaId={screen.mangaId} />;
       case 'backup':
         return <BackupSyncScreen />;
       case 'settings':
         return <SettingsScreen />;
       case 'repositories':
         return <RepositoriesScreen />;
+      case 'migration':
+        return <MigrationScreen />;
       default:
         return <HomeDashboardScreen />;
     }
   };
 
-  const showBottomNav = ['home', 'library', 'explore', 'updates', 'more'].includes(currentTab);
+  const showBottomNav = ['home', 'library', 'explore', 'updates', 'history', 'more'].includes(screen.type);
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#8B5CF6]/30 selection:text-white">
@@ -91,10 +94,10 @@ const MainContent: React.FC = () => {
       {showBottomNav && <BottomNavBar />}
 
       {/* Global Toast Notification */}
-      {toastMessage && (
+      {activeToast && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-[#18181E]/90 backdrop-blur-md border border-[#8B5CF6]/50 text-white text-xs font-semibold shadow-[0_0_20px_rgba(139,92,246,0.3)] animate-fade-in flex items-center gap-2 pointer-events-none">
           <span className="w-2 h-2 rounded-full bg-[#00E5FF] animate-ping" />
-          {toastMessage}
+          {activeToast}
         </div>
       )}
     </div>
