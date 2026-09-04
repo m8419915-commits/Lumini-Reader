@@ -1,11 +1,10 @@
-tasks.register("assembleDebug") {
-    doLast {
-        println("Lumina Reader React SPA compiled and verified successfully")
-    }
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
 }
 
-tasks.register("lint") {
-    doLast {
-        println("Lumina Reader lint check passed")
-    }
+tasks.register("clean", Delete::class) {
+    delete(rootProject.layout.buildDirectory)
 }

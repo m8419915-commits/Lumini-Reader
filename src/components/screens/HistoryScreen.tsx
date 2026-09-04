@@ -58,7 +58,7 @@ export const HistoryScreen: React.FC = () => {
   // Group by relative date
   const groupedItems: { [key: string]: HistoryItem[] } = {};
   filteredItems.forEach(item => {
-    const time = item.readAt || item.timestamp;
+    const time = item.readAt || item.timestamp || Date.now();
     const group = getGroupLabel(time);
     if (!groupedItems[group]) {
       groupedItems[group] = [];
@@ -166,7 +166,7 @@ export const HistoryScreen: React.FC = () => {
                 {items.map(item => {
                   const manga = getManga(item.mangaId);
                   const cover = item.coverUrl || manga?.thumbnailUrl || 'https://cdn.myanimelist.net/images/manga/2/180031.jpg';
-                  const timeVal = item.readAt || item.timestamp;
+                  const timeVal = item.readAt || item.timestamp || Date.now();
                   const timeFormatted = new Date(timeVal).toLocaleTimeString([], {
                     hour: 'numeric',
                     minute: '2-digit',

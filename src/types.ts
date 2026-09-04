@@ -106,7 +106,7 @@ export interface HistoryItem {
   chapterTitle?: string;
   pageIndex: number;
   totalPages: number;
-  timestamp: number;
+  timestamp?: number;
   readAt?: number;
   progressPercent?: number;
   dateGroup?: string; // 'Today' | 'Yesterday' | '2 days ago' | '3 days ago' | '20/08/26'

@@ -94,7 +94,7 @@ interface LuminaContextType {
 
   // History System (Mihon Parity)
   historyItems: HistoryItem[];
-  addHistoryItem: (item: Omit<HistoryItem, 'id' | 'readAt'>) => void;
+  addHistoryItem: (item: Omit<HistoryItem, 'id'>) => void;
   removeHistoryItem: (historyId: string) => void;
   clearHistory: () => void;
 
@@ -362,11 +362,11 @@ export const LuminaProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return saved ? JSON.parse(saved) : sampleHistoryItems;
   });
 
-  const addHistoryItem = (item: Omit<HistoryItem, 'id' | 'readAt'>) => {
+  const addHistoryItem = (item: Omit<HistoryItem, 'id'>) => {
     const newItem: HistoryItem = {
+      readAt: Date.now(),
       ...item,
       id: `hist_${Date.now()}`,
-      readAt: Date.now(),
     };
     setHistoryItems(prev => {
       // Remove previous entry for same manga & chapter to avoid duplicates at top
